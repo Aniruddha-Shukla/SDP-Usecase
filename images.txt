@@ -1,0 +1,6 @@
+# Public images to scan with `python -m inspector.scan` and the scheduled CI workflow.
+# One reference per line; pin a tag (or digest) so scans are comparable over time.
+python:3.11-slim
+python:3.12-alpine
+nginx:latest
+node:18

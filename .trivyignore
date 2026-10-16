@@ -1,0 +1,4 @@
+# Accepted risks for the CI gate on this project's own image.
+# One vulnerability ID per line, with a reason and a review date, e.g.:
+#
+# CVE-2023-45853  # zlib MiniZip only; not linked by anything we ship. Review 2026-12-31.

@@ -1,0 +1,9 @@
+[server]
+headless = true
+maxUploadSize = 200  # MB; Trivy reports for large images with --list-all-pkgs can be tens of MB
+
+[browser]
+gatherUsageStats = false
+
+# No [theme] section on purpose: Streamlit then follows the viewer's light/dark
+# preference, and the charts use Streamlit's Plotly theme to match.

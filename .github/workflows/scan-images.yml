@@ -1,0 +1,107 @@
+# Weekly Trivy scan of every public image in images.txt.
+# Produces one artifact, "trivy-scans", laid out like the repo's data/ folder:
+# download it, unzip into data/, and the dashboard picks it up.
+
+name: Scan public images
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_VERSION: v0.75.0
+
+jobs:
+  list:
+    name: Read images.txt
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.read.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: read
+        run: |
+          images=$(sed 's/#.*//' images.txt | awk 'NF {print $1}' | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          echo "Scanning: $images"
+
+  scan:
+    name: Scan ${{ matrix.image }}
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        image: ${{ fromJSON(needs.list.outputs.images) }}
+    steps:
+      - name: File name for this image
+        id: slug
+        env:
+          IMAGE: ${{ matrix.image }} # via env, never inline, so an image name can't inject shell
+        run: |
+          echo "slug=$(printf '%s' "$IMAGE" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/^_+|_+$//g')" >> "$GITHUB_OUTPUT"
+          mkdir -p scans sbom
+
+      - name: Vulnerability report
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          list-all-pkgs: true
+          format: json
+          output: scans/${{ steps.slug.outputs.slug }}.json
+
+      - name: SBOM
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          skip-setup-trivy: true
+          image-ref: ${{ matrix.image }}
+          format: cyclonedx
+          output: sbom/${{ steps.slug.outputs.slug }}.cdx.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scan-${{ steps.slug.outputs.slug }}
+          path: |
+            scans/
+            sbom/
+          retention-days: 7
+
+  collect:
+    name: Collect & summarise
+    needs: scan
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: scan-*
+          merge-multiple: true
+          path: data/
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Job summary
+        run: |
+          pip install -r requirements.txt
+          python -m inspector.report data/scans/*.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trivy-scans
+          path: |
+            data/scans/
+            data/sbom/
+          retention-days: 90
