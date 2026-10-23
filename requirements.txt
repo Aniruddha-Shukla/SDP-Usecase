@@ -1,6 +1,6 @@
 # Runtime dependencies for the Streamlit dashboard.
 # Exact pins so Trivy's filesystem scan (and Dependabot) can track them.
 # Trivy reports are plain JSON, so parsing needs nothing beyond the standard library + pandas.
-streamlit==1.65.0
+streamlit==1.66.0
 pandas==3.0.6
 plotly==7.1.0
