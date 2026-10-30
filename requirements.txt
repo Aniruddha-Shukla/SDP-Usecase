@@ -2,5 +2,5 @@
 # Exact pins so Trivy's filesystem scan (and Dependabot) can track them.
 # Trivy reports are plain JSON, so parsing needs nothing beyond the standard library + pandas.
 streamlit==1.65.0
-pandas==3.0.6
+pandas==3.1.0
 plotly==7.1.0
